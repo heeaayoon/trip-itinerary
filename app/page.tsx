@@ -1,65 +1,37 @@
-import Image from "next/image";
+// 1. 컴포넌트 불러오기
+import TripHeader from '@/components/TripHeader';
+import TripSchedule from '@/components/DailySchedule';
+import TravelTips from '@/components/TravelTips';
+import SharedNote from '@/components/SharedNote';
+
+// 2. 데이터 불러오기 (DB에서 가져오는 것처럼 분리된 파일에서 import)
+import { tripInfo, itinerary, considerations } from '@/data/tripData';
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-stone-50 py-10 px-4">
+      <div className="max-w-3xl mx-auto font-sans">
+        
+        {/* ① 여행 헤더 (제목, 날씨, 테마) */}
+        {/* 서버 컴포넌트라 렌더링이 빠릅니다. */}
+        <TripHeader info={tripInfo} />
+
+        {/* ② 여행 일정 스케줄 (탭 + 리스트) */}
+        {/* 클릭 이벤트가 필요한 부분은 이 안에서 ('use client') 처리됩니다. */}
+        <TripSchedule itinerary={itinerary} />
+
+        {/* ③ 하단 정보 영역 (꿀팁 & 공유 메모) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* 꿀팁 리스트 */}
+          <TravelTips tips={considerations} />
+          
+          {/* 공유 메모 (Supabase 연동) */}
+          <SharedNote />
+          
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+      </div>
+    </main>
   );
 }
