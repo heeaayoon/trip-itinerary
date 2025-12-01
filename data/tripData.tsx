@@ -1,3 +1,4 @@
+//더미 데이터
 import { Plane, Coffee, ShoppingBag, MapPin, Star, Heart, CloudSun, Utensils, Hotel, Car } from 'lucide-react';
 import { TripInfo, ItineraryDay, Consideration } from '@/types/itinerary';
 
