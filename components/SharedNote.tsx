@@ -1,87 +1,60 @@
 'use client';
-import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabase"; // 방금 만든 파일 불러오기
+import { TripNote } from "@/types/db"; 
 
-export default function SharedNote() {
-  const [note, setNote] = useState<string>("");
-  const [loading, setLoading] = useState(false);
+interface Props {
+  notes: TripNote[]; 
+  tripId: string;
+}
 
-  // 1. [불러오기] 컴포넌트가 켜지면 Supabase에서 1번 글을 가져옴
-  useEffect(() => {
-    getNote();
-  }, []);
+// (임시) 현재 로그인한 유저 ID라고 가정합니다. 나중에 Supabase 인증으로 대체해야 합니다.
+const currentUserId = "USER_ID_FROM_AUTH"; 
 
-  const getNote = async () => {
-    // notes 테이블에서 id가 1인 데이터를 가져와라
-    const { data, error } = await supabase
-      .from('notes')
-      .select('content')
-      .eq('id', 1)
-      .single();
-
-    if (data) {
-      setNote(data.content);
-    }
-    if (error) {
-      console.error("불러오기 실패:", error);
-    }
-  };
-
-  // 2. [저장하기] 버튼을 누르면 Supabase에 덮어씌움
-  const saveNote = async () => {
-    setLoading(true);
-    // notes 테이블의 id가 1인 데이터를 지금 내용으로 업데이트해라
-    const { error } = await supabase
-      .from('notes')
-      .update({ content: note })
-      .eq('id', 1);
-
-    if (error) {
-      alert("저장 실패 ㅠㅠ");
-    } else {
-      alert("저장 완료! 친구들도 볼 수 있어요 🎉");
-    }
-    setLoading(false);
-  };
+export default function SharedNote({ notes, tripId }: Props) {
+  
+  // 새 노트를 만들거나 기존 노트를 수정하는 로직이 필요합니다.
+  // (이 부분은 다음 단계에서 구현합니다)
 
   return (
-    <div className="w-full max-w-md mx-auto mt-6">
-      <div className="bg-yellow-100 border-2 border-yellow-300 rounded-xl p-4 shadow-md relative">
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-red-400 border border-red-600 shadow-sm"></div>
-        
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="font-bold text-yellow-800 flex items-center gap-2">
-            🌏 함께 쓰는 공유 메모
-          </h3>
-          <button 
-            onClick={getNote}
-            className="text-xs text-yellow-600 hover:text-yellow-800 underline"
-          >
-            새로고침
-          </button>
-        </div>
-        
-        <textarea
-          className="w-full h-40 bg-transparent border-none resize-none focus:ring-0 text-gray-700 leading-relaxed placeholder-yellow-500/50"
-          placeholder="여기에 적으면 친구들도 다 같이 볼 수 있어요!"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        
-        <div className="flex justify-end mt-2">
-            <button 
-                onClick={saveNote}
-                disabled={loading}
-                className={`px-4 py-1.5 rounded-lg text-sm font-bold text-white transition
-                    ${loading ? 'bg-gray-400' : 'bg-yellow-500 hover:bg-yellow-600 shadow-sm'}`}
-            >
-                {loading ? "저장 중..." : "☁️ 클라우드 저장"}
-            </button>
-        </div>
+    <div className="w-full">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-lg text-gray-800">🌏 공유 노트</h3>
+        <button className="px-3 py-1.5 bg-sky-500 text-white text-sm font-bold rounded-lg hover:bg-sky-600">
+          + 새 노트 작성
+        </button>
       </div>
-      <p className="text-center text-xs text-gray-400 mt-2">
-        * 저장 버튼을 눌러야 친구들에게 공유됩니다.
-      </p>
+
+      <div className="space-y-4">
+        {/* ▼▼▼ [핵심] props로 받은 notes 배열을 map으로 돌려 목록을 보여줍니다. ▼▼▼ */}
+        {notes.length > 0 ? (
+          notes.map((note) => (
+            <div key={note.id} className="bg-white p-4 rounded-xl shadow-sm border">
+              <div className="flex justify-between items-center">
+                <h4 className="font-bold text-gray-800">{note.title}</h4>
+                {/* ▼▼▼ 내가 쓴 글에만 수정/삭제 버튼이 보이도록 처리 ▼▼▼ */}
+                {note.user_id === currentUserId && (
+                  <div className="space-x-2">
+                    <button className="text-xs text-gray-500 hover:text-black">수정</button>
+                    <button className="text-xs text-red-500 hover:text-red-700">삭제</button>
+                  </div>
+                )}
+              </div>
+              {/* 
+                 ▼▼▼ [수정 4] content가 undefined일 수 있으므로 처리 
+                 TripNote 타입에서 content는 'string | undefined'입니다.
+                 내용이 없으면 빈 문자열("")을 보여주거나 안내 문구를 넣습니다.
+              */}
+              <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">
+                {note.content || "내용이 없습니다."}
+              </p>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-10 text-gray-400 bg-gray-50 rounded-lg">
+            <p>아직 작성된 노트가 없어요.</p>
+            <p className="text-sm mt-1">첫 번째 노트를 작성해보세요!</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

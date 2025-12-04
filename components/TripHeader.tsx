@@ -1,7 +1,9 @@
+// src/components/TripHeader.tsx
 import { Heart } from 'lucide-react';
-import { TripInfo } from '@/types/itinerary';
+// ▼▼▼ 정리된 타입 파일에서 TripHeaderInfo를 가져옵니다. ▼▼▼
+import { TripHeaderInfo } from '@/types/db'; 
 
-export default function TripHeader({ info }: { info: TripInfo }) {
+export default function TripHeader({ info }: { info: TripHeaderInfo }) {
   return (
     <div className="bg-white rounded-2xl shadow-lg p-8 mb-8 border-t-4 border-rose-400">
       <div className="flex justify-between items-start">
@@ -11,13 +13,15 @@ export default function TripHeader({ info }: { info: TripInfo }) {
             <span className="bg-rose-100 text-rose-700 px-3 py-1 rounded-full text-sm">
               {info.dates}
             </span>
+            {/* location 정보가 있다면 보여주는 것도 좋습니다. */}
+            {info.location && (
+               <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+                {info.location}
+              </span>
+            )}
           </p>
         </div>
         <Heart className="w-10 h-10 text-rose-400 fill-current" />
-      </div>
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 bg-gray-50 p-4 rounded-xl">
-        <div><span className="font-bold text-gray-700">날씨:</span> {info.weather}</div>
-        <div><span className="font-bold text-gray-700">컨셉:</span> {info.theme}</div>
       </div>
     </div>
   );

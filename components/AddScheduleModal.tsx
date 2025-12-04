@@ -1,173 +1,357 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, MapPin, Clock, Calendar as CalendarIcon, StickyNote, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import IconSelector from './IconSelector'; // 👈 요청하신 import 부분
-import { TripDay } from '@/types/db'; // 타입 import
+import IconSelector from './IconSelector';
+import { TripDay, TripSchedule } from '@/types/db'; //TripSchedule은 수정을 위한 타입
+// ▼▼▼ [수정] Schedule 타입을 import 해야 합니다. (경로는 실제 파일 위치에 맞게 조정하세요) ▼▼▼
+
+
+// 🔥 구글 맵 관련 라이브러리
+import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
+import { APIProvider, useMapsLibrary } from '@vis.gl/react-google-maps'; // useMapsLibrary 추가
 
 interface Props {
-  days: TripDay[];      // 👈 [수정] 전체 날짜 목록을 받음 (선택지용)
-  initialDayId: string; // 👈 [수정] 처음에 선택되어 있을 날짜 ID
-    //dayId: string;        // 1. 어느 날짜(TripDay)에 추가할지 ID를 받음
-  isOpen: boolean;      // 2. 모달이 열려있는지 여부
-  onClose: () => void;  // 3. 닫기 버튼 누르면 실행할 함수
-  onSuccess: () => void; // 4. 저장 성공 시 부모에게 알리는 함수 (새로고침용)
+  days: TripDay[];
+  initialDayId: string;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  scheduleToEdit: TripSchedule | null; // 수정할 스케줄 데이터(없으면 null)
 }
 
-export default function AddScheduleModal({ days, initialDayId, isOpen, onClose, onSuccess }: Props) {
-  // 폼 상태 관리
-  // 1. 선택된 날짜 ID 상태 관리 (기본값: props로 받은 초기값)
-  const [selectedDayId, setSelectedDayId] = useState(initialDayId);
-  const [loading, setLoading] = useState(false);
-  const [time, setTime] = useState('12:00');
-  const [activity, setActivity] = useState('');
-  const [description, setDescription] = useState('');
-  const [tips, setTips] = useState('');
-  const [icon, setIcon] = useState('plane'); // 기본값: 비행기
+// 🔥 [중요] libraries 배열은 반드시 컴포넌트 밖에서 상수로 선언해야 합니다.
+// (안 그러면 렌더링될 때마다 리로딩되어서 에러남)
+const LIBRARIES: ("places")[] = ["places"];
 
-  // 모달이 닫혀있으면 아무것도 렌더링하지 않음
-  if (!isOpen) return null;
+// 🔥 장소 검색 컴포넌트 (수정됨)
+function PlaceSearchInput({ 
+  defaultValue, 
+  onTitleChange, 
+  onLocationSelect,
+  inputStyle 
+}: { 
+  defaultValue: string;
+  onTitleChange: (val: string) => void;
+  onLocationSelect: (lat: number | null, lng: number | null) => void;
+  inputStyle: string;
+}) {
+  // 1. @vis.gl 훅을 사용해 'places' 라이브러리가 로드되었는지 감시
+  const placesLib = useMapsLibrary('places');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // 새로고침 방지
+  // ▼▼▼ [수정 1] 추천 목록 노출 여부를 제어하는 상태 추가 ▼▼▼
+  const [showSuggestions, setShowSuggestions] = useState(true);
 
-    if (!activity.trim()) {
-      alert("활동명을 입력해주세요!");
-      return;
+  const {
+    ready,
+    value,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+    init, // 🔥 수동 초기화 함수
+  } = usePlacesAutocomplete({
+    requestOptions: { /* types: ['establishment'] */ },
+    debounce: 300,
+    defaultValue: defaultValue,
+    initOnMount: false, // 🔥 [핵심] 라이브러리 로드 전까지 자동 실행 방지
+  });
+
+  // 2. places 라이브러리가 로드되면 그때 초기화(init) 실행
+  useEffect(() => {
+    if (placesLib) {
+      init();
     }
+  }, [placesLib, init]);
 
-    setLoading(true);
+  // defaultValue가 바뀌면 검색창 값 업데이트
+    useEffect(() => {
+    // defaultValue가 외부에서 변경될 때 입력창 값을 업데이트합니다.
+    // 단, false 옵션을 주어 이 변경으로 인해 새로운 검색이 실행되는 것을 방지합니다.
+    setValue(defaultValue, false);
+  }, [defaultValue, setValue]);
 
-    // Supabase에 데이터 저장 (테이블명 대문자 주의!)
-    const { error } = await supabase
-      .from('Schedules') 
-      .insert({
-        //day_id: dayId,      // 외래키(Foreign Key) 연결
-        day_id: selectedDayId, // 👈 [수정] 사용자가 선택한 날짜 ID로 저장
-        time: time,
-        activity: activity,
-        description: description,
-        tips: tips,
-        icon: icon          // 선택된 아이콘 문자열(예: 'food') 저장
-      });
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setValue(val);
+    onTitleChange(val); 
+    onLocationSelect(null, null); 
+    // ▼▼▼ [수정 2] 사용자가 다시 타이핑하면 목록을 보여주도록 설정 ▼▼▼
+    setShowSuggestions(true);
+  };
 
-    setLoading(false);
+  const handleSelect = async (mainText: string, fullAddress: string) => {
+    // ▼▼▼ [수정 3] 클릭 즉시 목록을 숨겨서 리렌더링으로 다시 나타나는 것을 방지 ▼▼▼
+    setShowSuggestions(false); 
+    setValue(fullAddress, false); // 입력창에는 전체 주소를 보여줍니다.
+    onTitleChange(mainText);      // 부모 컴포넌트의 title 상태는 장소 이름으로 설정합니다.
+    clearSuggestions();
 
-    if (error) {
-      console.error('저장 실패:', error);
-      alert("일정 저장 중 오류가 발생했습니다.");
-    } else {
-      // 성공 시 처리
-      alert("일정이 추가되었습니다! 🎉");
-      onSuccess(); // 부모 컴포넌트(TripSchedule) 새로고침
-      onClose();   // 모달 닫기
-      
-      // 입력 폼 초기화
-      setActivity('');
-      setDescription('');
-      setTips('');
-      setIcon('plane');
+    try {
+      // 위도/경도 검색은 전체 주소로 해야 정확합니다.
+      const results = await getGeocode({ address: fullAddress });
+      const { lat, lng } = await getLatLng(results[0]);
+      onLocationSelect(lat, lng);
+    } catch (error) {
+      console.error("Error: ", error);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      {/* 모달 박스 */}
-      <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        
-        {/* 닫기 버튼 (우측 상단) */}
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <X className="w-6 h-6" />
-        </button>
+    <div className="relative w-full">
+      <div className="relative">
+        <input
+          value={value}
+          onChange={handleInput}
+          disabled={!ready} // 라이브러리 로드 전엔 입력 불가
+          placeholder="장소 검색 또는 일정 제목 입력"
+          className={`${inputStyle} pr-12 font-bold text-lg`}
+          autoFocus
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+           <MapPin className="w-5 h-5" />
+        </div>
+      </div>
 
-        <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">
-          새 일정 추가하기
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* ✨ 날짜 선택 박스 추가 */}
-          <div>
-            <label className="text-sm font-bold text-gray-600 block mb-1">날짜 선택</label>
-            <select
-              value={selectedDayId}
-              onChange={(e) => setSelectedDayId(e.target.value)}
-              className="w-full border border-gray-300 p-2.5 rounded-xl focus:ring-2 focus:ring-rose-200 outline-none bg-white"
+      {/* ▼▼▼ [수정 4] status가 "OK"이고, showSuggestions가 true일 때만 목록을 렌더링 ▼▼▼ */}
+      {status === "OK" && showSuggestions && (
+        <ul className="absolute z-50 w-full bg-white border border-gray-100 rounded-xl mt-2 shadow-xl max-h-48 overflow-y-auto overflow-x-hidden">
+          {data.map(({ place_id, description, structured_formatting }) => (
+            <li
+              key={place_id}
+              onClick={() => handleSelect(structured_formatting.main_text, description)}
+              className="p-3 hover:bg-sky-50 cursor-pointer text-sm border-b last:border-0 transition-colors flex flex-col"
             >
-              {days.map((day) => (
-                <option key={day.id} value={day.id}>
-                  {day.day_number}일차 ({day.date}) - {day.day_theme}
-                </option>
-              ))}
-            </select>
-          </div>
-          {/* 1. 시간 & 활동명 입력 */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1">
-              <label className="text-sm font-bold text-gray-600 block mb-1">시간</label>
-              <input 
-                type="time" 
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="w-full border border-gray-300 p-2.5 rounded-xl focus:ring-2 focus:ring-rose-200 focus:border-rose-400 outline-none transition"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="text-sm font-bold text-gray-600 block mb-1">활동명</label>
-              <input 
-                type="text" 
-                placeholder="예: 맛집 탐방, 체크인"
-                value={activity}
-                onChange={(e) => setActivity(e.target.value)}
-                className="w-full border border-gray-300 p-2.5 rounded-xl focus:ring-2 focus:ring-rose-200 focus:border-rose-400 outline-none transition"
-              />
-            </div>
-          </div>
+              <span className="font-bold text-gray-800">
+                {structured_formatting.main_text}
+              </span>
+              <span className="text-xs text-gray-500 truncate">
+                {structured_formatting.secondary_text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
-          {/* 2. 상세 설명 */}
-          <div>
-            <label className="text-sm font-bold text-gray-600 block mb-1">설명</label>
-            <textarea 
-              placeholder="상세 내용을 적어주세요 (예: 메뉴 추천, 이동 방법 등)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full border border-gray-300 p-3 rounded-xl h-24 resize-none focus:ring-2 focus:ring-rose-200 focus:border-rose-400 outline-none transition"
-            />
-          </div>
+export default function AddScheduleModal({ days, initialDayId, isOpen, onClose, onSuccess, scheduleToEdit }: Props) {
+  // ▼▼▼ [수정] isEditMode 변수를 만들어 추가/수정 모드를 쉽게 구분 ▼▼▼
+  const isEditMode = !!scheduleToEdit;
+  const [selectedDayId, setSelectedDayId] = useState(initialDayId);
+  const [loading, setLoading] = useState(false);
+  
+  const [icon, setIcon] = useState('plane');
+  const [time, setTime] = useState('12:00');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [tips, setTips] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
 
-          {/* 3. 아이콘 선택 (IconSelector 사용) */}
-          <div>
-            <label className="text-sm font-bold text-gray-600 block mb-2">아이콘 선택</label>
-            {/* 👇 여기서 사용합니다! */}
+  // 아이콘별 힌트
+  const getPlaceholders = (iconType: string) => {
+    switch(iconType) {
+      case 'food': return { desc: '추천 메뉴, 예약 정보 등' };
+      case 'hotel': return { desc: '체크인 안내, 룸 타입 등' };
+      case 'transport': return { desc: '출발지 -> 도착지, 소요시간 등' };
+      case 'shopping': return { desc: '사야 할 물건 리스트' };
+      default: return { desc: '상세 내용 메모' };
+    }
+  };
+
+  const placeholders = getPlaceholders(icon);
+
+   useEffect(() => {
+    // 모달이 열릴 때만 실행
+    if (isOpen) {
+      // "수정 모드"일 경우, 전달받은 스케줄 데이터로 폼을 채움
+      if (isEditMode && scheduleToEdit) {
+        setSelectedDayId(scheduleToEdit.day_id);
+        setIcon(scheduleToEdit.icon || 'plane');
+        setTime(scheduleToEdit.time || '12:00');
+        setTitle(scheduleToEdit.activity || '');
+        setDescription(scheduleToEdit.description || '');
+        setTips(scheduleToEdit.tips || '');
+        setLat(scheduleToEdit.lat|| null);
+        setLng(scheduleToEdit.lng|| null);
+      } else {
+        // "추가 모드"일 경우, 폼을 깨끗하게 비움
+        setSelectedDayId(initialDayId);
+        setIcon('plane');
+        setTime('12:00');
+        setTitle('');
+        setDescription('');
+        setTips('');
+        setLat(null);
+        setLng(null);
+      }
+    }
+  }, [isOpen, scheduleToEdit, isEditMode, initialDayId]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return alert("제목을 입력해주세요!");
+
+    setLoading(true);
+
+    const scheduleData = {
+      day_id: selectedDayId,
+      time,
+      activity: title,
+      description,
+      tips,
+      icon,
+      lat,
+      lng
+    };
+
+    let error;
+
+    if (isEditMode) {
+      // "수정 모드"일 경우 update 실행
+      const { error: updateError } = await supabase
+        .from('Schedules')
+        .update(scheduleData)
+        .eq('id', scheduleToEdit.id); // 어떤 스케줄을 수정할지 id로 지정
+      error = updateError;
+    } else {
+      // "추가 모드"일 경우 insert 실행
+      const { error: insertError } = await supabase
+        .from('Schedules')
+        .insert(scheduleData);
+      error = insertError;
+    }
+
+    setLoading(false);
+
+    if (error) {
+      alert("오류가 발생했습니다.");
+    } else {
+      onSuccess();
+      onClose();
+    }
+  };
+
+  function formatDate(dateStr: string) {
+    return dateStr.replace(/-/g, '.');
+  }
+
+  const inputStyle = "w-full bg-gray-50 hover:bg-gray-100 focus:bg-white border-none rounded-2xl px-4 py-3.5 text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-sky-100 transition-all duration-200 outline-none";
+  const labelStyle = "text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1";
+
+  return (
+    // 🔥 [수정] libraries={LIBRARIES} 추가 (필수)
+    <APIProvider 
+      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}
+      libraries={LIBRARIES}
+    >
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+        <div className="bg-white w-full max-w-lg rounded-4xl shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
+          
+          <button 
+            onClick={onClose} 
+            className="absolute top-5 right-5 z-10 p-2 bg-white/50 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          <div className="pt-8 pb-6 px-6 bg-linear-to-b from-sky-50/50 to-white flex flex-col items-center">
+            <span className="text-xs font-semibold text-sky-600 mb-3 bg-sky-50 px-3 py-1 rounded-full border border-sky-100">
+              일정 카테고리 선택
+            </span>
             <IconSelector selectedIcon={icon} onSelect={setIcon} />
           </div>
 
-          {/* 4. 꿀팁 (선택 사항) */}
-          <div>
-            <label className="text-sm font-bold text-amber-600 block mb-1">꿀팁 (선택)</label>
-            <input 
-              type="text" 
-              placeholder="예: 웨이팅 있으니 10분 전 도착 필수!"
-              value={tips}
-              onChange={(e) => setTips(e.target.value)}
-              className="w-full border border-amber-200 bg-amber-50 p-2.5 rounded-xl focus:ring-2 focus:ring-amber-200 outline-none placeholder-amber-300/70"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="px-8 pb-8 space-y-5">
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelStyle}><CalendarIcon className="w-3 h-3 inline mr-1 mb-0.5"/>DATE</label>
+                <div className="relative">
+                  <select
+                    value={selectedDayId}
+                    onChange={(e) => setSelectedDayId(e.target.value)}
+                    className={`${inputStyle} appearance-none cursor-pointer`}
+                  >
+                    {days.map((day) => (
+                      <option key={day.id} value={day.id}>
+                        Day {day.day_number} ({formatDate(day.date)})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">▼</div>
+                </div>
+              </div>
+              <div>
+                <label className={labelStyle}><Clock className="w-3 h-3 inline mr-1 mb-0.5"/>TIME</label>
+                <input 
+                  type="time" 
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className={`${inputStyle} text-center font-medium`}
+                />
+              </div>
+            </div>
 
-          {/* 5. 저장 버튼 */}
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full bg-rose-500 hover:bg-rose-600 disabled:bg-gray-300 text-white font-bold py-3.5 rounded-xl transition-all shadow-md active:scale-[0.98] mt-4"
-          >
-            {loading ? "저장 중..." : "일정 저장하기 ✨"}
-          </button>
+            <div>
+              <label className={labelStyle}>TITLE & PLACE</label>
+              {/* PlaceSearchInput 내부에서 useMapsLibrary로 로딩 체크함 */}
+              <PlaceSearchInput 
+                defaultValue={title}
+                onTitleChange={(val) => setTitle(val)} 
+                onLocationSelect={(latitude, longitude) => { 
+                  setLat(latitude);
+                  setLng(longitude);
+                }}
+                inputStyle={inputStyle}
+              />
+              {lat && lng && (
+                <p className="text-[10px] text-sky-600 mt-1.5 ml-1 flex items-center font-medium animate-in fade-in slide-in-from-top-1">
+                  <MapPin className="w-3 h-3 mr-1" /> 지도 위치가 설정되었습니다.
+                </p>
+              )}
+            </div>
 
-        </form>
+            <div>
+              <label className={labelStyle}><StickyNote className="w-3 h-3 inline mr-1 mb-0.5"/>MEMO</label>
+              <textarea 
+                placeholder={placeholders.desc}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className={`${inputStyle} h-24 resize-none`}
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-amber-500 uppercase tracking-wider mb-1.5 ml-1">
+                <Sparkles className="w-3 h-3 inline mr-1 mb-0.5"/>HONEY TIP
+              </label>
+              <input 
+                type="text" 
+                placeholder="메모하기"
+                value={tips}
+                onChange={(e) => setTips(e.target.value)}
+                className="w-full bg-amber-50 hover:bg-amber-100/50 focus:bg-white border-none rounded-2xl px-4 py-3.5 text-gray-800 placeholder-amber-400/70 focus:ring-2 focus:ring-amber-200 transition-all duration-200 outline-none"
+              />
+            </div>
+
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white text-lg font-bold py-4 rounded-2xl transition-all active:scale-[0.98] mt-4 shadow-xl shadow-gray-200"
+            >
+              {loading 
+                ? "저장 중..." 
+                : isEditMode ? "일정 수정" : "일정 등록"}
+            </button>
+            
+          </form>
+        </div>
       </div>
-    </div>
+    </APIProvider>
   );
 }

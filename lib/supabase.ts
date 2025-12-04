@@ -1,3 +1,4 @@
+//supabase와 연결 설정 및 인증
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://jyerijwjeiqvuyxqzsyi.supabase.co'
