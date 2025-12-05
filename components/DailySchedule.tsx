@@ -2,7 +2,7 @@
 
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, Plus, Trash2, Edit2 } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit2, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getIcon } from '@/utils/iconMap';
 import { extendTripOneDay, shortenTripOneDay } from '@/lib/actions'; 
@@ -12,6 +12,7 @@ import { TripSchedule as TSchedule } from '@/types/db';
 // 컴포넌트
 import DayTabs from './DayTabs'; 
 import AddScheduleModal from './AddScheduleModal'; 
+import AIRecommendationModal from './AIRecommendationModal';
 
 // 데이터 타입 정의
 interface ScheduleItem {
@@ -30,9 +31,12 @@ interface Props {
 
 export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
   const [activeTab, setActiveTab] = useState(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  // ▼▼▼ [수정] 수정할 스케줄 데이터를 담을 상태를 추가합니다. ▼▼▼
-  const [editingSchedule, setEditingSchedule] = useState<TSchedule | null>(null);
+  
+  //모달 상태 관리
+  const [isModalOpen, setIsModalOpen] = useState(false); // 수동 입력 모달
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false); // AI 추천 모달 상태 추가
+  const [editingSchedule, setEditingSchedule] = useState<TSchedule | null>(null); // 수정할 스케줄 데이터를 담을 상태
+ 
   const [isPending, startTransition] = useTransition(); 
   const router = useRouter();
 
@@ -110,6 +114,7 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
 
   const handleSuccess = () => {
     handleCloseModal(); // 모달을 닫고
+    setIsAIModalOpen(false); // AI 모달도 성공 시 닫아줌
     router.refresh();   // 페이지를 새로고침
   };
 
@@ -138,14 +143,22 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
                 : "날씨 정보 없음"}
             </span>
           </div>
-
-          <button 
-            onClick={handleAddClick}
-            className="text-sm bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg 
-                      flex items-center gap-1 transition font-bold border border-rose-100 shadow-sm"
-          >
-            <Plus className="w-4 h-4" /> 일정 추가
-          </button>
+          {/* ▼▼▼ 오른쪽: 버튼 그룹 (AI 추천 + 수동 추가) ▼▼▼ */}
+          <div className="flex items-center gap-2">
+            {/* ✨ AI 추천 버튼 */}
+            <button 
+              onClick={() => setIsAIModalOpen(true)}
+              className="text-sm bg-linear-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white px-3 py-1.5 rounded-lg 
+                        flex items-center gap-1 transition font-bold shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+              <Sparkles className="w-4 h-4" /> AI 추천
+            </button>
+            <button 
+              onClick={handleAddClick}
+              className="text-sm bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg 
+                        flex items-center gap-1 transition font-bold border border-rose-100 shadow-sm">
+              <Plus className="w-4 h-4" /> 일정 추가
+            </button>
+          </div>
         </h2>
 
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 mt-6">
@@ -200,14 +213,23 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
         </div>
       </div>
 
+      {/* 기존 수동 입력 모달 */}
       <AddScheduleModal 
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         days={rawDays} 
         initialDayId={currentData.dayId || ""} 
         onSuccess={handleSuccess}
-        scheduleToEdit={editingSchedule}
-      />
+        scheduleToEdit={editingSchedule}/>
+
+      {/* ✨ AI 추천 모달 (새로 추가됨) */}
+      <AIRecommendationModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        days={rawDays}
+        tripId={tripId}
+        currentDayId={currentData.dayId || ""} // 현재 보고 있는 탭의 Day ID를 전달
+        onSuccess={handleSuccess}/>
     </>
   );
 }

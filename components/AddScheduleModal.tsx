@@ -192,6 +192,7 @@ export default function AddScheduleModal({ days, initialDayId, isOpen, onClose, 
 
   if (!isOpen) return null;
 
+  //DB에 스케줄 저장
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return alert("제목을 입력해주세요!");
