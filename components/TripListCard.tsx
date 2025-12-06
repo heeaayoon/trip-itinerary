@@ -45,7 +45,7 @@ export default function TripListCard({ trip, onDeleteSuccess }: Props) {
           </h2>
           <div className="flex items-center text-gray-500 mt-2 text-sm">
             <Calendar className="w-4 h-4 mr-1" />
-            {trip.start_date} ~ {trip.end_date}
+            {trip.start_date} - {trip.end_date}
           </div>
           {trip.theme && (
             <span className="inline-block bg-sky-50 text-sky-600 text-xs mt-3 px-2 py-1 rounded-md font-medium">

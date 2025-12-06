@@ -12,7 +12,7 @@ import { TripSchedule as TSchedule } from '@/types/db';
 // 컴포넌트
 import DayTabs from './DayTabs'; 
 import AddScheduleModal from './AddScheduleModal'; 
-import AIRecommendationModal from './AIRecommendationModal';
+import AIRecommendationModal from './AIRecommendation/index';
 
 // 데이터 타입 정의
 interface ScheduleItem {

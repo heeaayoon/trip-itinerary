@@ -1,7 +1,6 @@
 import React from 'react'; 
 import { Plane, Coffee, ShoppingBag, MapPin, Star, Heart, CloudSun, Utensils, Hotel, Car } from 'lucide-react';
 
-// 1. 🔥 [핵심 수정] Tailwind JIT가 인식하도록 클래스 풀네임을 적어줍니다.
 export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { text: string, active: string, hover: string } }> = {
   plane: { 
     label: '이동', Icon: Plane, 
