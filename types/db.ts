@@ -32,6 +32,7 @@ export interface TripSchedule {
   id: string;
   day_id: string;
   time: string;
+  time_end?: string; // 👈 [추가] optional 속성으로 추가
   activity: string;
   description?: string;
   icon: string;

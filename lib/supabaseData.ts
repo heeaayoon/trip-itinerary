@@ -2,19 +2,19 @@
 import { supabase } from './supabase';
 import { TripForList, Trip } from '@/types/db';
 
-//모든 여행 데이터를 가져오는 함수
-export async function getAllTrips(): Promise<TripForList[]> {
+// 변경: userId를 인자로 받아서, 그 사람이 만든 여행만 가져옵니다.
+export async function getMyTrips(userId: string): Promise<TripForList[]> {
   const { data, error } = await supabase
     .from('Trips')
-    .select('id, title, start_date, end_date, theme') // 목록에서는 간단한 정보만 가져옵니다.
-    .order('start_date', { ascending: false }); // 최신 여행 순으로 정렬
+    .select('id, title, start_date, end_date, theme')
+    .eq('created_by', userId) // 👈 [핵심] 만든 사람이 '나(userId)'인 것만 필터링!
+    .order('start_date', { ascending: false });
 
   if (error) {
-    console.error('DB 에러 (모든 여행):', error);
-    return []; // 에러 시 빈 배열 반환
+    console.error('DB 에러 (나의 여행):', error);
+    return [];
   }
 
-  // data가 null일 경우를 대비해 빈 배열을 반환합니다.
   return data || [];
 }
 

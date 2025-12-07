@@ -1,8 +1,7 @@
-// src/components/DayTabs.tsx
 "use client";
 
 import Image from 'next/image';
-import { Plus, X } from 'lucide-react'; // 아이콘
+import { Plus, X } from 'lucide-react';
 
 interface ScheduleItem {
   day: number;
@@ -15,14 +14,21 @@ interface Props {
   activeTab: number;
   onTabChange: (index: number) => void;
   onAddDay: () => void;           // 날짜 추가 핸들러
-  onDeleteDay: (index: number) => void; // 🔥 삭제 핸들러 (인덱스로 처리)
+  onDeleteDay: (index: number) => void; // 삭제 핸들러
   isUpdating: boolean;            // 로딩 상태
 }
 
 export default function DayTabs({ scheduleData, activeTab, onTabChange, onAddDay, onDeleteDay, isUpdating }: Props) {
+ const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [_, month, day] = dateStr.split('-');
+    return `${month}.${day}`;
+  };
+
   return (
-    <div className="w-full border-b border-gray-200 bg-white">
-      <div className="flex overflow-x-auto pb-2 px-4 scrollbar-hide gap-2 items-center">
+    <div className="w-full bg-white/80 rounded-2xl backdrop-blur-sm sticky top-0 z-20 shadow-sm">
+      {/* 🔥 [수정] 삭제 버튼이 잘리지 않도록 상단에 여백(pt-4) 추가 */}
+      <div className="flex overflow-x-auto px-4 pt-4 pb-2 custom-scrollbar gap-3 items-start">
         
         {scheduleData.map((item, index) => {
           const isActive = activeTab === index;
@@ -31,56 +37,60 @@ export default function DayTabs({ scheduleData, activeTab, onTabChange, onAddDay
             <div key={item.date} className="relative group shrink-0">
               <button
                 onClick={() => onTabChange(index)}
+                // 🔥 [색상 수정] Blue 계열로 변경
                 className={`
                   flex flex-col items-center justify-center
-                  min-w-[100px] py-3 px-2 rounded-xl transition-all duration-300 h-full border border-transparent
+                  w-24 h-24 rounded-2xl transition-all duration-300 border
                   ${isActive 
-                    ? 'bg-rose-500 text-white shadow-md transform -translate-y-1' 
+                    ? 'bg-blue-500 text-white shadow-lg transform -translate-y-1 border-transparent' 
                     : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-100'
                   }
                 `}
               >
-                <div className={`text-xs mb-1 ${isActive ? 'text-rose-100' : 'text-gray-400'}`}>
-                  {item.date.slice(5).replace('-', '.')}
-                </div>
-                <div className="text-lg font-bold mb-1">
+                {/* Day 번호 */}
+                <div className="text-sm font-bold">
                   Day {item.day}
                 </div>
+                {/* 날짜 (MM.DD) */}
+                <div className={`text-xs mb-1 ${isActive ? 'text-blue-100' : 'text-gray-400'}`}>
+                  {formatDate(item.date)}
+                </div>
 
-                {/* 날씨 정보 표시 */}
-                {item.weather ? (
-                  <div className="flex items-center gap-1 mt-1 bg-white/20 rounded-full px-2 py-0.5">
+              {/* 🔥 [수정] 날씨 정보 표시 부분 */}
+              <div className={`flex items-center justify-center h-[26px] mt-1`}>
+                {item.weather && item.weather.icon ? (
+                  <div className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
                     <div className="relative w-5 h-5">
                       <Image 
+                        key={item.weather.icon} // 아이콘이 바뀔 때 리렌더링을 돕기 위해 key 추가
                         src={`https://raw.githubusercontent.com/visualcrossing/WeatherIcons/main/SVG/4th%20Set%20-%20Color/${item.weather.icon}.svg`}
-                        alt="icon" fill className="object-contain"
-                      />
+                        alt={item.weather.desc || 'weather icon'}
+                        fill
+                        sizes="20px" // 이미지 크기에 대한 힌트 제공
+                        className="object-contain"/>
                     </div>
-                    <span className={`text-[10px] font-medium ${isActive ? 'text-white' : 'text-gray-600'}`}>
-                      {item.weather.tempMax}°
+                    <span className={`text-xs font-bold ${isActive ? 'text-white' : 'text-gray-700'}`}>
+                      {Math.round(item.weather.tempMax)}°
                     </span>
                   </div>
                 ) : (
-                  <span className="text-[10px] opacity-50 h-[22px] flex items-center">No Data</span>
+                  // 날씨 정보가 없을 때도 높이를 유지하여 UI가 깨지지 않도록 함
+                  <div className="h-[26px]"></div>
                 )}
-              </button>
+              </div>
+            </button>
 
-              {/* 🔥 [NEW] 삭제 버튼 (마지막 날짜에만 표시 or 모든 날짜에 표시) */}
-              {/* 로직 꼬임을 방지하기 위해 일단 '마지막 날짜'인 경우에만 삭제 버튼을 보여줍니다. */}
+              {/* 삭제 버튼 */}
               {index === scheduleData.length - 1 && scheduleData.length > 1 && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation(); // 탭 이동 방지
-                    onDeleteDay(index);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); onDeleteDay(index); }}
                   disabled={isUpdating}
-                  className="
-                    absolute -top-2 -right-2 bg-gray-600 text-white rounded-full p-1 shadow-md
-                    opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-500 z-10
-                  "
-                  title="이 날짜 삭제 (기간 단축)"
+                  // 🔥 [수정] z-index를 더 높게 주고, 색상 변경
+                  className="absolute -top-1 -right-1 bg-white text-gray-400 rounded-full p-0.5 border shadow-md
+                             opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white z-30"
+                  title="이 날짜 삭제"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
@@ -91,17 +101,18 @@ export default function DayTabs({ scheduleData, activeTab, onTabChange, onAddDay
         <button
           onClick={onAddDay}
           disabled={isUpdating}
-          className="flex flex-col shrink-0 items-center justify-center w-[60px] h-[90px] 
-                     rounded-xl border-2 border-dashed border-gray-300 text-gray-400 
-                     hover:border-rose-400 hover:text-rose-500 hover:bg-rose-50 
+          // 🔥 [수정] 호버 색상을 Blue 계열로 변경
+          className="flex flex-col shrink-0 items-center justify-center w-24 h-24
+                     rounded-2xl border-2 border-dashed border-gray-300 text-gray-400 
+                     hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 
                      disabled:opacity-50 transition-all"
         >
            {isUpdating ? (
-             <div className="w-5 h-5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+             <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
            ) : (
              <>
-               <Plus className="w-6 h-6 mb-1" />
-               <span className="text-[10px] font-bold">Day 추가</span>
+               <Plus className="w-6 h-6" />
+               <span className="text-xs font-bold mt-1">Day 추가</span>
              </>
            )}
         </button>

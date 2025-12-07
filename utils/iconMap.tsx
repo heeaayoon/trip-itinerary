@@ -1,13 +1,24 @@
 import React from 'react'; 
 import { Plane, Coffee, ShoppingBag, MapPin, Star, Heart, CloudSun, Utensils, Hotel, Car } from 'lucide-react';
 
-export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { text: string, active: string, hover: string } }> = {
+// 🔥 style 객체 안에 'card' 속성 추가
+export const ICON_CONFIG: Record<string, { 
+  label: string, 
+  Icon: any, 
+  style: { 
+    text: string, 
+    active: string, 
+    hover: string,
+    card: { bg: string, border: string } // 👈 이 부분을 추가합니다!
+  } 
+}> = {
   plane: { 
     label: '이동', Icon: Plane, 
     style: { 
-      text: 'text-sky-500', // 리스트용
-      active: 'bg-sky-500 text-white shadow-sky-200 ring-sky-100', // 선택됨
-      hover: 'hover:bg-sky-50 hover:text-sky-600' // 호버
+      text: 'text-sky-500',
+      active: 'bg-sky-500 text-white shadow-sky-200 ring-sky-100',
+      hover: 'hover:bg-sky-50 hover:text-sky-600',
+      card: { bg: 'bg-sky-50', border: 'border-sky-200' } // 👈
     } 
   },
   hotel: { 
@@ -15,7 +26,8 @@ export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { te
     style: { 
       text: 'text-indigo-500',
       active: 'bg-indigo-500 text-white shadow-indigo-200 ring-indigo-100',
-      hover: 'hover:bg-indigo-50 hover:text-indigo-600'
+      hover: 'hover:bg-indigo-50 hover:text-indigo-600',
+      card: { bg: 'bg-indigo-50', border: 'border-indigo-200' } 
     } 
   },
   food: { 
@@ -23,7 +35,8 @@ export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { te
     style: { 
       text: 'text-orange-500',
       active: 'bg-orange-500 text-white shadow-orange-200 ring-orange-100',
-      hover: 'hover:bg-orange-50 hover:text-orange-600'
+      hover: 'hover:bg-orange-50 hover:text-orange-600',
+      card: { bg: 'bg-orange-50', border: 'border-orange-200' } 
     } 
   },
   coffee: { 
@@ -31,7 +44,8 @@ export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { te
     style: { 
       text: 'text-amber-500',
       active: 'bg-amber-500 text-white shadow-amber-200 ring-amber-100',
-      hover: 'hover:bg-amber-50 hover:text-amber-600'
+      hover: 'hover:bg-amber-50 hover:text-amber-600',
+      card: { bg: 'bg-amber-50', border: 'border-amber-200' } 
     } 
   },
   shopping: { 
@@ -39,7 +53,8 @@ export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { te
     style: { 
       text: 'text-pink-500',
       active: 'bg-pink-500 text-white shadow-pink-200 ring-pink-100',
-      hover: 'hover:bg-pink-50 hover:text-pink-600'
+      hover: 'hover:bg-pink-50 hover:text-pink-600',
+      card: { bg: 'bg-pink-50', border: 'border-pink-200' } 
     } 
   },
   nature: { 
@@ -47,7 +62,8 @@ export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { te
     style: { 
       text: 'text-emerald-500',
       active: 'bg-emerald-500 text-white shadow-emerald-200 ring-emerald-100',
-      hover: 'hover:bg-emerald-50 hover:text-emerald-600'
+      hover: 'hover:bg-emerald-50 hover:text-emerald-600',
+      card: { bg: 'bg-emerald-50', border: 'border-emerald-200' }
     } 
   },
   car: { 
@@ -55,7 +71,8 @@ export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { te
     style: { 
       text: 'text-slate-500',
       active: 'bg-slate-500 text-white shadow-slate-200 ring-slate-100',
-      hover: 'hover:bg-slate-50 hover:text-slate-600'
+      hover: 'hover:bg-slate-50 hover:text-slate-600',
+      card: { bg: 'bg-slate-50', border: 'border-slate-200' }
     } 
   },
   star: { 
@@ -63,7 +80,8 @@ export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { te
     style: { 
       text: 'text-yellow-500',
       active: 'bg-yellow-500 text-white shadow-yellow-200 ring-yellow-100',
-      hover: 'hover:bg-yellow-50 hover:text-yellow-600'
+      hover: 'hover:bg-yellow-50 hover:text-yellow-600',
+      card: { bg: 'bg-yellow-50', border: 'border-yellow-200' } // 👈
     } 
   },
   heart: { 
@@ -71,7 +89,8 @@ export const ICON_CONFIG: Record<string, { label: string, Icon: any, style: { te
     style: { 
       text: 'text-rose-500',
       active: 'bg-rose-500 text-white shadow-rose-200 ring-rose-100',
-      hover: 'hover:bg-rose-50 hover:text-rose-600'
+      hover: 'hover:bg-rose-50 hover:text-rose-600',
+      card: { bg: 'bg-rose-50', border: 'border-rose-200' } // 👈
     } 
   },
 };

@@ -5,7 +5,7 @@ export default function StepResult({ likedPlace, selectedTime, setSelectedTime, 
    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-white z-20">
         <div className="text-center mb-6 animate-in zoom-in duration-300">
         <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ThumbsUp className="w-12 h-12 text-indigo-600" />
+            <ThumbsUp className="w-12 h-12 text-indigo-600" /> //이거부터 수정
         </div>
         <h3 className="text-2xl font-bold text-gray-900 px-4">{likedPlace.name}</h3>
         <p className="text-gray-500 mt-2 text-sm">{likedPlace.vicinity}</p>

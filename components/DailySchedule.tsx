@@ -2,24 +2,29 @@
 
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, Plus, Trash2, Edit2, Sparkles } from 'lucide-react';
+import Image from 'next/image';
+import { MapPin, Plus, Calendar, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { getIcon } from '@/utils/iconMap';
 import { extendTripOneDay, shortenTripOneDay } from '@/lib/actions'; 
-import TripMap from './TripMap';
 import { TripSchedule as TSchedule } from '@/types/db';
+
+// dnd-kit 라이브러리 import
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 
 // 컴포넌트
 import DayTabs from './DayTabs'; 
 import AddScheduleModal from './AddScheduleModal'; 
 import AIRecommendationModal from './AIRecommendation/index';
+import TripMap from './TripMap';
+import ScheduleCard from './ScheduleCard';
 
 // 데이터 타입 정의
 interface ScheduleItem {
   day: number;      
   date: string;     
   weather: any;     
-  plans: any[];     
+  plans: TSchedule[];
   dayId?: string;   
 }
 
@@ -29,8 +34,11 @@ interface Props {
   rawDays: any[];               
 }
 
-export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
+export default function TripSchedule({ tripId, scheduleData: initialScheduleData, rawDays }: Props) {
   const [activeTab, setActiveTab] = useState(0);
+
+  // 드래그 시 상태 변경 관리
+  const [scheduleData, setScheduleData] = useState(initialScheduleData);
   
   //모달 상태 관리
   const [isModalOpen, setIsModalOpen] = useState(false); // 수동 입력 모달
@@ -40,6 +48,12 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
   const [isPending, startTransition] = useTransition(); 
   const router = useRouter();
 
+  // dnd-kit 센서 설정
+  const sensors = useSensors(useSensor(PointerSensor, {
+    // 그냥 클릭하는 것과 드래그를 구분하기 위해,
+    // 마우스를 8px 이상 움직였을 때만 드래그로 인식
+    activationConstraint: {distance: 8,},
+  }));
 
   if (!scheduleData || scheduleData.length === 0) {
     return <div className="p-6 bg-white rounded-lg text-center text-gray-500">일정 데이터가 없습니다.</div>;
@@ -47,7 +61,13 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
   // 현재 탭의 데이터 (일정들)
   const currentData = scheduleData[activeTab] || scheduleData[0];
 
-  // 1. 날짜 연장 (Add Day)
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [_, month, day] = dateStr.split('-');
+    return `${month}.${day}`;
+  };
+
+  // 1. 날짜 연장
   const handleExtendTrip = () => {
     if (!confirm("여행 기간을 하루 더 연장하시겠습니까?")) return;
     startTransition(async () => {
@@ -60,7 +80,7 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
     });
   };
 
-  // 2. 날짜 삭제 (Delete Day)
+  // 2. 날짜 삭제
   const handleDeleteDay = (index: number) => {
     if (index !== scheduleData.length - 1) {
       alert("여행 일정의 꼬임을 방지하기 위해 '마지막 날짜'만 삭제하여 기간을 줄일 수 있습니다.");
@@ -89,13 +109,13 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
     else router.refresh();
   };
 
-    // ▼▼▼ [수정] "수정" 버튼을 클릭했을 때 실행될 함수를 추가합니다. ▼▼▼
+    // 4. "수정" 버튼을 클릭했을 때 실행될 함수
   const handleEditClick = (schedule: TSchedule) => {
     setEditingSchedule(schedule); // 수정할 데이터를 state에 저장
     setIsModalOpen(true);         // 모달 열기
   };
 
-  // ▼▼▼ [수정] "일정 추가" 버튼 클릭 시, 수정 상태를 null로 초기화합니다. ▼▼▼
+  // 5. "추가" 버튼 클릭 시, 수정 상태를 null로 초기화
   const handleAddClick = () => {
     if (!currentData.dayId) {
       alert("일정을 추가하려면 먼저 데이터가 생성되어야 합니다.");
@@ -105,7 +125,7 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
     setIsModalOpen(true);
   };
   
-  // ▼▼▼ [수정] 모달이 닫힐 때, 수정 상태도 함께 초기화합니다. ▼▼▼
+  // 모달이 닫힐 때, 수정 상태도 함께 초기화
   const handleCloseModal = () => {
     setIsModalOpen(false);
     // 애니메이션을 위해 약간의 딜레이 후 state 초기화
@@ -118,6 +138,47 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
     router.refresh();   // 페이지를 새로고침
   };
 
+  // 드래그 종료 시 실행될 함수
+  const handleDragEnd = async (event: any) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      // 1. 화면 즉시 업데이트 (Optimistic Update)
+      const oldIndex = currentData.plans.findIndex(p => p.id === active.id);
+      const newIndex = currentData.plans.findIndex(p => p.id === over.id);
+      
+      const reorderedPlans = arrayMove(currentData.plans, oldIndex, newIndex);
+
+      // 전체 scheduleData 상태 업데이트
+      const updatedScheduleData = scheduleData.map((dayData, index) => 
+        index === activeTab ? { ...dayData, plans: reorderedPlans } : dayData
+      );
+      setScheduleData(updatedScheduleData);
+
+      // 2. DB에 변경된 순서(display_order) 저장
+      try {
+        const updates = reorderedPlans.map((plan, index) => ({
+          id: plan.id,
+          display_order: index
+        }));
+
+        // rpc 함수 호출
+        const { error } = await supabase.rpc('update_schedule_order', {
+          updates: updates 
+        });
+
+        if (error) throw error;
+        //console.log("순서가 RPC를 통해 성공적으로 저장되었습니다.");
+
+      } catch (error) {
+        alert("순서 변경 저장에 실패했습니다.");
+        setScheduleData(initialScheduleData);
+      }
+    }
+  };
+
+  const hasPlansWithLocation = currentData.plans.some(p => p.lat && p.lng);
+
   return (
     <>
       <DayTabs 
@@ -129,88 +190,86 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
         isUpdating={isPending}         
       />
 
-      <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 mt-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-6 flex justify-between items-center pb-4 border-b">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <MapPin className="text-indigo-500 w-5 h-5" />
-              <span>Day {currentData.day}</span>
-              <span className="text-sm font-normal text-gray-500">({currentData.date})</span>
-            </div>
-            <span className="text-xs text-rose-500 mt-1 pl-7 font-medium">
-              {currentData.weather 
-                ? `${currentData.weather.desc}, 최고 ${currentData.weather.tempMax}°` 
-                : "날씨 정보 없음"}
-            </span>
-          </div>
-          {/* ▼▼▼ 오른쪽: 버튼 그룹 (AI 추천 + 수동 추가) ▼▼▼ */}
-          <div className="flex items-center gap-2">
-            {/* ✨ AI 추천 버튼 */}
-            <button 
-              onClick={() => setIsAIModalOpen(true)}
-              className="text-sm bg-linear-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white px-3 py-1.5 rounded-lg 
-                        flex items-center gap-1 transition font-bold shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-              <Sparkles className="w-4 h-4" /> AI 추천
-            </button>
-            <button 
-              onClick={handleAddClick}
-              className="text-sm bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg 
-                        flex items-center gap-1 transition font-bold border border-rose-100 shadow-sm">
-              <Plus className="w-4 h-4" /> 일정 추가
-            </button>
-          </div>
-        </h2>
-
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 mt-6">
-          {/* //지도 추가 */}
-          {currentData.plans && currentData.plans.some((p: any) => p.lat && p.lng) && (
-          <TripMap schedules={currentData.plans} />)}
-          {currentData.plans && currentData.plans.length > 0 ? (
-            currentData.plans.map((item: any) => (
-              <div key={item.id} className="group relative pl-8 border-l-2 border-rose-200 last:border-0 pb-6 last:pb-0 hover:bg-gray-50/50 rounded-r-xl transition-colors p-2 -ml-2">
-                <div className="absolute -left-[9px] top-0 bg-white p-1 rounded-full border border-rose-200 shadow-sm">
-                  {getIcon(item.icon)}
-                </div>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 mb-1">
-                      <span className="font-bold text-rose-600 text-lg w-16 shrink-0">{item.time}</span>
-                      <h3 className="font-bold text-gray-800 text-lg">{item.activity}</h3>
+      {/* 🔥 [수정] 메인 컨텐츠: Day 상세 정보 전체를 하나의 카드로 통합 */}
+      <div className="mt-6">
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+          {/* 1. Day 헤더 & 액션 버튼 */}
+          <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <MapPin className="text-blue-500 w-5 h-5" />
+                <span className="text-xl font-bold text-gray-800">Day {currentData.day}</span>
+                <span className="text-gray-400 text-sm">({formatDate(currentData.date)})</span>
+              </div>
+              
+              <div className="flex items-center gap-2 text-sm text-gray-500 pl-7">
+                {currentData.weather?.icon ? (
+                  <>
+                    <div className="relative w-5 h-5">
+                      <Image key={currentData.weather.icon} src={`https://raw.githubusercontent.com/visualcrossing/WeatherIcons/main/SVG/4th%20Set%20-%20Color/${currentData.weather.icon}.svg`} alt={currentData.weather.desc || '날씨 아이콘'} fill sizes="20px" className="object-contain" />
                     </div>
-                    <p className="text-gray-600 mb-2">{item.description}</p>
-                    {item.tips && (
-                      <div className="bg-amber-50 text-amber-800 text-sm p-3 rounded-lg inline-block border border-amber-100">
-                        <span className="font-bold">💡 Tip:</span> {item.tips}
+                    <span>{currentData.weather.desc}, 최고 {Math.round(currentData.weather.tempMax)}°</span>
+                  </>
+                ) : <span>날씨 정보 없음</span>}
+              </div>
+            </div>
+
+            <div className="flex gap-2 w-full sm:w-auto shrink-0">
+              <button onClick={() => setIsAIModalOpen(true)} 
+                      className="flex-1 sm:flex-none text-sm bg-linear-to-r from-blue-500 to-indigo-600 
+                                text-white px-3 py-2 rounded-xl font-bold 
+                                hover:shadow-lg transition flex items-center justify-center gap-1 shadow-md">
+                <Sparkles className="w-4 h-4" /> <span className="sm:inline">AI 추천</span>
+              </button>
+              <button onClick={handleAddClick} 
+                      className="flex-1 sm:flex-none text-sm bg-gray-900 text-white px-3 py-2 rounded-xl font-bold
+                               hover:bg-black transition flex items-center justify-center gap-1 shadow-md">
+                <Plus className="w-4 h-4" /> <span className="sm:inline">추가</span>
+              </button>
+            </div>
+          </div>
+          
+          {/* 2. 지도 영역 */}
+          <div className="h-64 md:h-80 w-full">
+             {hasPlansWithLocation ? (
+               <TripMap schedules={currentData.plans} />
+             ) : (
+               <div className="w-full h-full bg-gray-50 flex flex-col items-center justify-center text-gray-400">
+                 <MapPin className="w-8 h-8 mb-2 opacity-20" />
+                 <p className="text-sm">지도에 표시할 장소가 없습니다.</p>
+               </div>
+             )}
+          </div>
+
+        </div>
+          {/* 3. 일정 리스트 */}
+          <div className="mt-6">
+            <div className=" bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={currentData.plans.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                  <div className="p-4 sm:p-6 min-h-[400px]">
+                    {currentData.plans.length > 0 ? (
+                      <div className="flex flex-col">
+                        {currentData.plans.map((item, index) => (
+                          <ScheduleCard key={item.id} 
+                                        item={item} 
+                                        isLast={index === currentData.plans.length - 1} 
+                                        onEdit={handleEditClick} 
+                                        onDelete={handleDeleteSchedule} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-gray-400 py-12">
+                        <Calendar className="w-12 h-12 mb-2 opacity-20" />
+                        <p>아직 등록된 일정이 없어요.</p>
+                        <button onClick={handleAddClick} className="mt-2 text-blue-500 font-bold hover:underline">첫 일정 추가하기</button>
                       </div>
                     )}
                   </div>
-                  {/* ▼▼▼ [수정] 수정 버튼과 삭제 버튼을 담을 컨테이너를 추가합니다. ▼▼▼ */}
-                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <button 
-                      onClick={() => handleEditClick(item)} 
-                      className="text-gray-400 hover:text-sky-500 p-2"
-                      aria-label="일정 수정"
-                    >
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteSchedule(item.id)} 
-                      className="text-gray-400 hover:text-red-500 p-2"
-                      aria-label="일정 삭제"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-12 text-gray-400 bg-gray-50/50 rounded-xl border-2 border-dashed border-gray-200">
-              <p>아직 등록된 일정이 없어요.</p>
-              <p className="text-sm mt-1">우측 상단 <strong>[+ 일정 추가]</strong> 버튼을 눌러보세요!</p>
+                </SortableContext>
+              </DndContext>
             </div>
-          )}
-        </div>
+          </div>
       </div>
 
       {/* 기존 수동 입력 모달 */}
@@ -222,7 +281,7 @@ export default function TripSchedule({ tripId, scheduleData, rawDays }: Props) {
         onSuccess={handleSuccess}
         scheduleToEdit={editingSchedule}/>
 
-      {/* ✨ AI 추천 모달 (새로 추가됨) */}
+      {/* AI 추천 모달 */}
       <AIRecommendationModal
         isOpen={isAIModalOpen}
         onClose={() => setIsAIModalOpen(false)}
