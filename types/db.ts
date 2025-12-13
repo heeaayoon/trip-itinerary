@@ -82,8 +82,9 @@ export interface DailyScheduleData {
 export interface TripForList {
   id: string;
   title: string;
-  start_date: string;
-  end_date: string;
-  theme?: string;
-  location?: string; // 목록에도 지역이 나오면 좋으니 추가
+  startDate: string; // JSON으로 넘어올 때는 날짜도 문자열입니다.
+  endDate: string;
+  location: string;
+  country: string;
+  status: string;
 }

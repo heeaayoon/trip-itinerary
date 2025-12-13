@@ -9,7 +9,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  userId: string;
+  //userId: string;
 }
 
 // Cities 테이블 데이터 타입
@@ -23,7 +23,7 @@ interface CityData {
   lng: number;
 }
 
-export default function AddTripModal({ isOpen, onClose, onSuccess, userId }: Props) {
+export default function AddTripModal({ isOpen, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   
   // --- 1. 기본 여행 정보 (기존 로직) ---
@@ -167,7 +167,7 @@ export default function AddTripModal({ isOpen, onClose, onSuccess, userId }: Pro
           admin_name: selectedCity.admin_name,
           latitude: selectedCity.lat,
           longitude: selectedCity.lng,
-          created_by: userId,
+          //created_by: userId,
           status: 'PLANNING' // 상태 추가
         })
         .select()
@@ -332,7 +332,7 @@ export default function AddTripModal({ isOpen, onClose, onSuccess, userId }: Pro
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" checked={useAI} onChange={e => setUseAI(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-rose-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-rose-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
                 </label>
               </div>
 
@@ -405,7 +405,7 @@ export default function AddTripModal({ isOpen, onClose, onSuccess, userId }: Pro
 
             <div className="pt-4">
               <button type="submit" disabled={loading}
-                className={`w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all ${loading ? 'bg-gray-400' : useAI ? 'bg-gradient-to-r from-rose-500 to-orange-500 hover:opacity-90' : 'bg-gray-800'}`}>
+                className={`w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition-all ${loading ? 'bg-gray-400' : useAI ? 'bg-linear-to-r from-rose-500 to-orange-500 hover:opacity-90' : 'bg-gray-800'}`}>
                 {loading ? "저장 중..." : useAI ? "✨ AI로 여행 만들기" : "기본 여행 생성하기"}
               </button>
             </div>

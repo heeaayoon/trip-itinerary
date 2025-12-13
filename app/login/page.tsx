@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+//import { supabase } from '@/lib/supabase';
+import apiClient from '@/lib/api'; //supabase 대신 axios API 클라이언트 사용
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -16,54 +17,45 @@ export default function LoginPage() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  // 폼 제출 처리 (로그인 or 회원가입)
+  //apiClient를 이용한 폼 제출 처리 함수
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    if (isLoginMode) {
-      // 🔵 로그인 로직
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        alert('로그인 실패: ' + error.message);
+    try{
+      //로그인 모드
+      if(isLoginMode){ 
+        const resp = await apiClient.post('/api/auth/login', {email, password}); //요청 본문에 사용자가 입력한 email과 password를 JSON 객체 형태로 담아 보냄
+        const { token } = resp.data; //응답 데이터에서(백) 토큰 추출
+        if(token){ //토큰이 존재하면
+          localStorage.setItem('accessToken', token); //local storage에 저장
+          alert('로그인 성공! 환영합니다.');
+          router.push('/'); //메인 페이지로 이동
+          router.refresh(); //서버 컴포넌트 데이터 새로고침
+        } else {
+          alert('로그인 실패: 서버로부터 받은 토큰이 없습니다.'); //응답 본문에 토큰이 없으면 실패 처리
+        }
       } else {
-        router.push('/'); // 메인으로 이동
-        router.refresh(); // 상단 헤더 갱신
-      }
-
-    } else {
-      // 🟢 회원가입 로직
-      if (!name) {
-        alert('이름을 입력해주세요!');
-        setLoading(false);
-        return;
-      }
-
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: name, // ⭐️ 중요: DB에 저장될 이름
-          },
-        },
-      });
-
-      if (error) {
-        alert('가입 실패: ' + error.message);
-      } else {
+        //회원가입 모드
+        const resp = await apiClient.post('/api/auth/signup', {name, email, password});
         alert('회원가입 성공! 자동으로 로그인됩니다.');
-        router.push('/');
-        router.refresh();
+        //회원가입 후 자동 로그인 처리
+        const loginResp = await apiClient.post('/api/auth/login', {email, password});
+        const { token } = loginResp.data;
+        if(token){
+          localStorage.setItem('accessToken', token);
+          router.push('/'); //메인 페이지로 이동
+          router.refresh();
+        } else {
+          alert('회원가입 실패: 서버로부터 받은 토큰이 없습니다.');
+        }
       }
+    }catch(error){
+      console.error("폼 제출 오류:", error);
+      alert("문제가 발생했습니다. 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
-  };
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
