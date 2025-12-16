@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # [1] 데이터베이스 (MySQL)
+  db:
+    image: mysql:8.0
+    container_name: trip-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      TZ: Asia/Seoul # 타임존 설정 (선택사항, 로그 확인시 편리함)
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./DB:/docker-entrypoint-initdb.d
+    # 헬스체크 추가: MySQL이 실제로 응답(Ping)할 수 있는지 확인
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s       # 10초마다 검사
+      timeout: 5s         # 5초 내 응답 없으면 실패 간주
+      retries: 5          # 5번 실패하면 비정상(unhealthy)으로 간주
+      start_period: 30s   # 초기화(init.sql 등)가 오래 걸릴 수 있으니 처음 30초는 실패해도 봐줌
+    # 컨테이너가 죽으면 자동 재시작
+    restart: always
+
+  # [2] 백엔드 (Spring Boot)
+  backend:
+    build: ./back
+    container_name: trip-back
+    ports:
+      - "8080:8080"
+    # DB가 그냥 켜진 게 아니라 'healthy' 상태가 될 때까지 대기
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      WEATHER_API_KEY: ${WEATHER_API_KEY}
+    # DB 연결 실패 등으로 컨테이너가 죽더라도 다시 시도하도록 설정
+    restart: on-failure
+
+  # [3] 프론트엔드 (Next.js)
+  frontend:
+    build: ./front
+    container_name: trip-front
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    restart: on-failure
+
+volumes:
+  db_data:

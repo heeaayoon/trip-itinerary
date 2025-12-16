@@ -1,0 +1,23 @@
+# Git 관련
+.git
+.gitignore
+
+# IDE 설정
+.metadata
+.settings
+.classpath
+.project
+.vscode
+.idea
+
+# 빌드 결과물 (여기가 핵심!)
+target/
+back/target/
+dist/
+build/
+.next/
+node_modules/
+npm-debug.log
+
+# 환경 변수
+.env

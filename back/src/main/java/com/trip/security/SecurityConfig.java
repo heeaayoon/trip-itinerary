@@ -1,7 +1,7 @@
 package com.trip.security;
+
 import java.util.Arrays;
 
-//보안 설정 파일
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,10 +13,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource; // [중요] reactive가 빠진 올바른 import
 
-@Configuration // 이 클래스가 Spring의 설정 파일임을 알려줌
-@EnableWebSecurity // 웹 보안을 활성화함
+@Configuration
+@EnableWebSecurity
 public class SecurityConfig {
 	
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -26,7 +26,6 @@ public class SecurityConfig {
 	}
 	
 	@Bean
-	//비밀번호 암호화를 위한 인코더
 	public PasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder();
 	}
@@ -34,44 +33,49 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-        		// [1단계] CORS 설정을 Security Filter Chain에 적용합니다.
-        		.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable()) // CSRF 보안 비활성화 (REST API에서는 보통 비활성화)
-                // [중요] 세션 사용 안 함 설정 (STATELESS)
-                .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))// JWT 토큰을 쓰기 때문에 서버에 세션을 저장하지 않음
-                // HTTP 요청에 대한 접근 권한 설정
-                .authorizeHttpRequests(auth -> auth
-                	    .requestMatchers("/api/auth/**").permitAll() //로그인, 회원가입은 누구나 가능
-                	    .requestMatchers("/api/cities/**").permitAll() //도시 조회도 누구나 가능
-                	    .requestMatchers("/error").permitAll() // 스프링 부트가 에러 났을 때 보내는 곳(/error)도 허용
-                	    .anyRequest().authenticated() //나머지는 인증 필요
-                )
-                // [중요] 만든 "JWT 필터"를 "기본 로그인 필터"보다 먼저 실행되게 배치함
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            // [1단계] CORS 설정 적용
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // CSRF 비활성화
+            .csrf(csrf -> csrf.disable())
+            // 세션 미사용 (JWT 사용)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // 접근 권한 설정
+            .authorizeHttpRequests(auth -> auth
+                // [수정] 메인 화면("/")과 정적 리소스도 허용 (403 방지)
+                .requestMatchers("/", "/index.html", "/static/**").permitAll()
+                // [수정] 로그인 관련 경로를 좀 더 명확하게 추가
+                .requestMatchers("/api/auth/**", "/api/login", "/api/signup").permitAll()
+                // 도시 조회 허용
+                .requestMatchers("/api/cities/**").permitAll()
+                // 에러 페이지 허용
+                .requestMatchers("/error").permitAll()
+                // 나머지는 인증 필요
+                .anyRequest().authenticated()
+            )
+            // JWT 필터 배치
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
     
-    // [2단계] 구체적인 CORS 정책을 설정하는 Bean을 새롭게 등록합니다.
-    // WebConfig 대신, 이제 Spring Security가 이 설정을 사용하게 됩니다.
+    // [2단계] CORS 설정 Bean
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // 허용할 출처(프론트엔드 주소)를 설정합니다.
+        // 프론트엔드 주소 허용
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
         
-        // 허용할 HTTP 메소드를 설정합니다. ("*"는 모든 메소드를 의미)
+        // 모든 HTTP 메서드 허용
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         
-        // 허용할 헤더를 설정합니다.
+        // 모든 헤더 허용
         configuration.setAllowedHeaders(Arrays.asList("*"));
         
-        // 인증 정보(쿠키, 토큰 등)를 포함한 요청을 허용합니다.
+        // 쿠키/인증정보 허용
         configuration.setAllowCredentials(true);
         
-        org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
-        // 모든 경로("/**")에 대해 위에서 만든 CORS 정책을 적용합니다.
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         
         return source;

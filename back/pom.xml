@@ -11,7 +11,7 @@
 	<groupId>com.trip</groupId>
 	<artifactId>Back</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>Back</name>
+	<name>TripBack</name>
 	<description>Demo project for Spring Boot</description>
 	<url/>
 	<licenses>
