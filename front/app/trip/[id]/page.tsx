@@ -1,6 +1,5 @@
 "use client";
 
-import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import apiClient from '@/lib/api';
@@ -11,11 +10,8 @@ interface TripDetailDataFromApi {
   tripHeaderInfo: TripHeaderInfo;
   scheduleData: DailyScheduleData[];
   tripId: string;
-  // TODO: 백엔드 DTO에 tripNotes, tripTips를 추가해야 합니다.
   tripNotes: TripNote[];
   tripTips: TripTip[];
-  // rawDays는 프론트엔드에서만 사용되므로, API 응답에는 포함되지 않을 수 있습니다.
-  // 이 부분은 TripSchedule 컴포넌트에서 어떻게 처리할지 결정이 필요합니다.
 }
 
 export default function TripDetailPage() {
@@ -33,9 +29,35 @@ export default function TripDetailPage() {
     const fetchTripDetail = async () => {
       try {
         setLoading(true);
-        // 백엔드 API를 호출합니다.
+        // 백엔드 API를 호출
         const response = await apiClient.get(`/api/trips/${tripId}`);
-        setTripData(response.data);
+        const data: TripDetailDataFromApi = response.data;
+        console.log("여행 상세 정보 응답:", data);
+
+        // 데이터를 화면에 그리기 전에 다시 정렬
+        // DB에 저장된 순서가 꼬여 있을 수 있기 때문
+        if (data.scheduleData) {
+          data.scheduleData.forEach((day) => {
+            if (day.plans) {
+              day.plans.sort((a: any, b: any) => {
+                // 1순위: displayOrder (순서 번호) 오름차순
+                const orderA = a.displayOrder ?? 999; // 없으면 맨 뒤로
+                const orderB = b.displayOrder ?? 999;
+                
+                if (orderA !== orderB) {
+                  return orderA - orderB;
+                }
+
+                // 2순위 (번호가 같으면): 시작 시간(time) 오름차순
+                // 시간이 없으면(null) 맨 뒤로 보냄
+                const timeA = a.time || '23:59';
+                const timeB = b.time || '23:59';
+                return timeA.localeCompare(timeB);
+              });
+            }
+          });
+        }
+        setTripData(data);
       } catch (error: any) {
         console.error("여행 상세 정보 로드 실패:", error);
         if (error.response?.status === 401 || error.response?.status === 403) {
@@ -68,7 +90,6 @@ export default function TripDetailPage() {
     );
   }
 
-  // --- [ ✅ 최종 연결! ] ---
   // 데이터 로딩이 성공하면, TripMainView를 렌더링하고,
   // API로부터 받은 tripData 객체를 'data' prop에 통째로 넘겨줍니다.
   // rawDays는 TripService에서 따로 만들어주지 않았으므로, 임시로 빈 배열을 넘겨줍니다.

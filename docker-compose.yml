@@ -45,16 +45,16 @@ services:
     restart: on-failure
 
   # [3] 프론트엔드 (Next.js)
-  frontend:
-    build: ./front
-    container_name: trip-front
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080
-    restart: on-failure
+  # frontend:
+  #   build: ./front
+  #   container_name: trip-front
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - backend
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: http://localhost:8080
+  #   restart: on-failure
 
 volumes:
   db_data:

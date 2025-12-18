@@ -17,6 +17,7 @@ interface Props {
 }
 
 export default function ScheduleCard({ item, isLast, onEdit, onDelete }: Props) {
+  //console.log("ScheduleCard 렌더링:", item.time);
   const {
     attributes,
     listeners,
@@ -34,10 +35,10 @@ export default function ScheduleCard({ item, isLast, onEdit, onDelete }: Props) 
   const ringColor = config ? config.style.border : 'ring-gray-300';
 
   return (
-    // 🔥 1. 최상위 div: dnd 속성, group, 간격(pb-6) 담당
+    // 1. 최상위 div: dnd 속성, group, 간격(pb-6) 담당
     <div ref={setNodeRef} style={dndStyle} {...attributes} className="group relative touch-none pb-6 last:pb-0">
       
-      {/* 🔥 2. 메인 컨테이너: 반응형 레이아웃의 핵심 */}
+      {/* 2. 메인 컨테이너: 반응형 레이아웃의 핵심 */}
       {/* 모바일에서는 세로(flex-col), 데스크탑(md:)에서는 가로(md:flex-row)로 배치 */}
       <div className="flex flex-col md:flex-row md:items-start md:gap-4">
 
@@ -48,16 +49,16 @@ export default function ScheduleCard({ item, isLast, onEdit, onDelete }: Props) 
             <MoreVertical className="w-5 h-5" />
           </div>
           {/* 시간 */}
-          <p className="font-bold text-gray-700 text-sm w-16 text-right">
-            {item.time?.split('-')[0].trim()}
-          </p>
+          {item.icon === 'plane' ?
+              <></>:<p className="font-bold text-gray-700 text-sm w-16 text-left">
+                {item.time?item.time.substring(0,5):'시간없음'}
+              </p>}
         </div>
 
         {/* [오른쪽] 카드 영역 */}
         <div className="flex-1">
           <div className="relative transition-all duration-300 transform group-hover:-translate-y-1">
             <div className={`relative rounded-2xl group-hover:ring-2 group-hover:ring-offset-2 ${ringColor}`}>
-              
               {item.icon === 'plane' ? (
                 <FlightCard item={item} />
               ) : (
@@ -76,7 +77,6 @@ export default function ScheduleCard({ item, isLast, onEdit, onDelete }: Props) 
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

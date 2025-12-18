@@ -14,12 +14,12 @@ export default function FlightCard({ item }: Props) {
 
   // 1. 시간 정보
   const startTime = item.time;
-  const endTime = item.time_end; // 👈 새로 추가된 컬럼에서 도착 시간을 가져옵니다
+  const endTime = item.time_end; 
 
-  // 2. 공항 정보 (description 파싱)
-  const airportParts = item.description?.split('->').map(a => a.trim()) || ['출발공항', '도착공항'];
-  const departureAirport = airportParts[0];
-  const arrivalAirport = airportParts[1];
+  // 2. 공항 정보 (description 파싱) --> 나중에 추가
+  // const airportParts = item.description?.split('->').map(a => a.trim()) || ['출발공항', '도착공항'];
+  // const departureAirport = airportParts[0];
+  // const arrivalAirport = airportParts[1];
 
   return (
     <div className={`rounded-2xl border-2 p-4 shadow-sm transition-all ${style.border} bg-linear-to-br from-sky-50 to-indigo-50`}>
@@ -48,7 +48,7 @@ export default function FlightCard({ item }: Props) {
 
         {/* 도착 정보 */}
         <div className="text-center">
-          <p className="text-xl font-bold text-gray-800">{endTime}</p> {/* 👈 도착 시간 표시 */}
+          <p className="text-xl font-bold text-gray-800">{endTime}</p>
           {/* <p className="text-xs font-medium text-gray-500">{arrivalAirport}</p> */}
         </div>
       </div>

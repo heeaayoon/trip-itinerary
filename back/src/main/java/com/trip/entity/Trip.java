@@ -9,8 +9,6 @@ import java.util.UUID;
 
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicInsert;
-import org.hibernate.annotations.Type;
-import org.hibernate.annotations.UuidGenerator;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -65,13 +63,13 @@ public class Trip {
 	private String status;
 	
 	//비행정보(Text 타입)
-	@Column(name="flight_out_dept", columnDefinition = "TEXT")
+	@Column(name="flight_out_dept")
 	private LocalDateTime flightOutDept; 
-	@Column(name="flight_out_arr", columnDefinition = "TEXT")
+	@Column(name="flight_out_arr")
 	private LocalDateTime flightOutArr; 
-	@Column(name="flight_in_dept", columnDefinition = "TEXT")
+	@Column(name="flight_in_dept")
 	private LocalDateTime flightInDept;
-	@Column(name="flight_in_arr", columnDefinition = "TEXT")
+	@Column(name="flight_in_arr")
 	private LocalDateTime flightInArr;
 	
 	// 이 여행을 생성한 사용자 (N:1)

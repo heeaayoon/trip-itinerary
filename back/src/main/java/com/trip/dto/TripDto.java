@@ -36,10 +36,11 @@ public class TripDto {
 		private BigDecimal latitude;
 		private BigDecimal longitude;
 		//비행 정보
-		private LocalDateTime flightOutDept; 
-		private LocalDateTime flightOutArr; 
-		private LocalDateTime flightInDept;
-		private LocalDateTime flightInArr;
+		// LocalDateTime -> LocalTime으로 변경
+        private LocalTime flightOutDept; 
+        private LocalTime flightOutArr; 
+        private LocalTime flightInDept;
+        private LocalTime flightInArr;
 		
 		//AI 추천시에 필요한 취향 정보(Trip_preferences 테이블)
 		private Boolean useAI; // 프론트엔드의 useAI 상태값 (true/false)

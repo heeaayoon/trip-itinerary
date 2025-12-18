@@ -3,9 +3,11 @@ package com.trip.service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +19,8 @@ import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.trip.dto.TripDto;
 import com.trip.entity.Day;
+import com.trip.entity.Schedule;
+import com.trip.entity.ScheduleStatus;
 import com.trip.entity.Trip;
 import com.trip.entity.TripParticipant;
 import com.trip.entity.TripParticipantId;
@@ -28,6 +32,8 @@ import com.trip.repository.*;
 //AI옵션이 켜진 경우 -> tripPreference 저장
 @Service
 public class TripService {
+
+    private final ScheduleRepository scheduleRepository;
     private final TripRepository tripRepository;
     private final TripPreferenceRepository preferenceRepository;
     private final DayRepository dayRepository;
@@ -47,19 +53,18 @@ public class TripService {
                        UserRepository userRepository,
                        TripParticipantRepository tripParticipantRepository, // 수정된 레포지토리 주입
                        AIService aiService,
-                       RestTemplate restTemplate) {
+                       RestTemplate restTemplate, ScheduleRepository scheduleRepository) {
         this.tripRepository = tripRepository;
         this.preferenceRepository = preferenceRepository;
         this.dayRepository = dayRepository;
         this.userRepository = userRepository;
         this.tripParticipantRepository = tripParticipantRepository; // 수정된 레포지토리 주입
         this.aiService = aiService;
-        this.restTemplate = restTemplate;}
+        this.restTemplate = restTemplate;
+        this.scheduleRepository = scheduleRepository;}
     
-    /**
-     * Visual Crossing API를 호출하여 특정 날짜의 날씨 정보를 가져와 Day 엔티티에 저장합니다.
-     * 이 정보는 나중에 실시간 API 실패 시의 백업 데이터로 사용됩니다.
-     */
+    // Visual Crossing API를 호출하여 특정 날짜의 날씨 정보를 가져와 Day 엔티티에 저장합니다.
+    //이 정보는 나중에 실시간 API 실패 시의 백업 데이터로 사용됩니다.
     private void setDayWeatherFromApi(Day day, Double lat, Double lon, LocalDate date) {
         try {
             // 특정 날짜 한정 API URL 생성 (시작일과 종료일을 동일하게 설정)
@@ -95,7 +100,23 @@ public class TripService {
 	    	//1.토큰 이메일로 현재 로그인한 유저 찾기
 	    	User user = userRepository.findByEmail(email)
 	    			.orElseThrow(()->new RuntimeException("사용자를 찾을 수 없습니다."));
-	    	//2.기본 여행 정보 저장(Trips 테이블)
+	    	
+			// [수정] 시간 데이터 결합 로직
+			// request.getFlightOutDept()가 LocalTime이므로 startDate와 합쳐 LocalDateTime을 만듭니다.
+			LocalDateTime flightOutDept = request.getFlightOutDept() != null ? 
+					LocalDateTime.of(request.getStartDate(), request.getFlightOutDept()) : null;
+					
+			LocalDateTime flightOutArr = request.getFlightOutArr() != null ? 
+					LocalDateTime.of(request.getStartDate(), request.getFlightOutArr()) : null;
+					
+			// 귀국편은 여행 종료일(endDate) 기준으로 결합
+			LocalDateTime flightInDept = request.getFlightInDept() != null ? 
+					LocalDateTime.of(request.getEndDate(), request.getFlightInDept()) : null;
+					
+			LocalDateTime flightInArr = request.getFlightInArr() != null ? 
+					LocalDateTime.of(request.getEndDate(), request.getFlightInArr()) : null;
+			
+			//2.기본 여행 정보 저장(Trips 테이블)
 	    	Trip trip = Trip.builder()
 	    			.title(request.getTitle())
 	    			.startDate(request.getStartDate())
@@ -107,11 +128,12 @@ public class TripService {
 	    			.longitude(request.getLongitude())
 	    			.status("PLANNING")
 	    			.creator(user) //User연결
-	    			.flightOutDept(request.getFlightOutDept())
-                    .flightOutArr(request.getFlightOutArr())
-                    .flightInDept(request.getFlightInDept())
-                    .flightInArr(request.getFlightInArr())
-	    			.build();
+	    			// 위에서 가공한 LocalDateTime을 넣기
+					.flightOutDept(flightOutDept)
+					.flightOutArr(flightOutArr)
+					.flightInDept(flightInDept)
+					.flightInArr(flightInArr)
+					.build();
 	    	Trip savedTrip = tripRepository.save(trip); //먼저 저장해야 trip id가 생성됨
 	    	
 	    	//트립 저장 후, 여행을 생성한 user를 첫번째 참여자로 테이블에 넣기
@@ -152,6 +174,47 @@ public class TripService {
 	    	}
 	    	dayRepository.saveAll(savedDays); // 날씨 정보가 포함된 Day 엔티티를 모두 저장
 	    
+	    	//변경부분입니다.
+	        // 사용자 입력 항공편을 Schedule로 먼저 저장
+	        // ScheduleRepository를 TripService 생성자에 주입
+	        // private final ScheduleRepository scheduleRepository;
+	        List<Schedule> userSchedules = new ArrayList<>();
+	        Day firstDay = savedDays.get(0);
+	        Day lastDay = savedDays.get(savedDays.size() - 1);
+	        
+	        // 출국 항공편 (가는 날)
+	        if (savedTrip.getFlightOutDept() != null && savedTrip.getFlightOutArr() != null) {
+	            userSchedules.add(Schedule.builder()
+	                .day(firstDay)
+	                .time(savedTrip.getFlightOutDept().toLocalTime())
+	                .timeEnd(savedTrip.getFlightOutArr().toLocalTime())
+	                .activity("항공편 탑승 (출국)")
+	                .icon("plane")
+	                .isAiGenerated(false) // 사용자가 직접 입력
+	                .status(ScheduleStatus.PLANNED)
+	                .displayOrder(1) // 출국편은 무조건 1번
+	                .build());
+	        }
+	        
+	        // 귀국 항공편 (오는 날)
+	        if (savedTrip.getFlightInDept() != null && savedTrip.getFlightInArr() != null) {
+	            userSchedules.add(Schedule.builder()
+	                .day(lastDay)
+	                .time(savedTrip.getFlightInDept().toLocalTime())
+	                .timeEnd(savedTrip.getFlightInArr().toLocalTime())
+	                .activity("항공편 탑승 (귀국)")
+	                .icon("plane")
+	                .isAiGenerated(false) // 사용자가 직접 입력
+	                .status(ScheduleStatus.PLANNED)
+	                .displayOrder(999) // 귀국편은 무조건 맨 마지막 (999번)
+	                .build());
+	        }
+
+	        // ScheduleRepository를 통해 먼저 저장 (TripService에 주입 필요)
+	        if (!userSchedules.isEmpty()) {
+	            scheduleRepository.saveAll(userSchedules);
+	        }
+	        
 	    	//4.AI 사용시에만, 사용자 취향 데이터 저장(Trip_preferences 테이블)
 	    	if (Boolean.TRUE.equals(request.getUseAI())) {
 	            TripPreference savedPref = TripPreference.builder()
@@ -282,7 +345,9 @@ public class TripService {
 	                dailyData.setDayId(matchingDay.getId().toString()); //dayId 저장
 	                List<TripDto.ScheduleDto> plans = matchingDay.getSchedules().stream() //SELECT * FROM schedules WHERE day_id = ? 이 여기서 실행되지 XX -> 앞에서 이미 다 가져왔음
 							  															  //matchingDay.getSchedules()로 schedules 엔티티를 가져옴(DB에서 가져오는거 아님)
-	                        .map(TripDto.ScheduleDto::new) //각 Schedule 엔티티를 프론트엔드용 Schedule DTO 객체로 변환
+	                		.sorted(Comparator.comparing(Schedule::getDisplayOrder, Comparator.nullsLast(Comparator.naturalOrder())) //displayOrder 기준으로 정렬
+	                        .thenComparing(Schedule::getTime, Comparator.nullsLast(Comparator.naturalOrder())))//displayOrder가 같다면(혹은 null이면) time 기준으로 2차 정렬
+	                		.map(TripDto.ScheduleDto::new) //각 Schedule 엔티티를 프론트엔드용 Schedule DTO 객체로 변환
 	                        .collect(Collectors.toList());
 	                dailyData.setPlans(plans); //하루의 모든 스케줄(plans)을 저장
 	            } else {
